@@ -2,7 +2,7 @@
 dist/
 # generated types
 .astro/
-
+.claude/
 # dependencies
 node_modules/
 
@@ -27,3 +27,5 @@ PLAN.md
 # local editorial workspace
 research/
 .cache/
+
+codex-skills/
