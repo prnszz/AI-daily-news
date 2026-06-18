@@ -1,3 +1,8 @@
+# pnpm v11+ gates dependency build scripts on `allowBuilds` (a map).
+# `onlyBuiltDependencies` is kept for pnpm v10 compatibility.
+allowBuilds:
+  esbuild: true
+  sharp: true
 onlyBuiltDependencies:
   - esbuild
   - sharp
