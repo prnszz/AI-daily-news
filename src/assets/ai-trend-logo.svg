@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="AI Trend">
+  <defs>
+    <linearGradient id="trend" x1="34" y1="178" x2="204" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset=".55" stop-color="#67e8f9"/>
+      <stop offset="1" stop-color="#a3e635"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="208" height="208" rx="44" fill="#111827"/>
+  <path d="M48 178h160" stroke="#2dd4bf" stroke-width="10" stroke-linecap="round" opacity=".18"/>
+  <path d="M50 170l45-45 33 29 75-88" fill="none" stroke="url(#trend)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M168 66h35v35" fill="none" stroke="#a3e635" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="50" cy="170" r="14" fill="#f8fafc"/>
+  <circle cx="95" cy="125" r="14" fill="#f8fafc"/>
+  <circle cx="128" cy="154" r="14" fill="#f8fafc"/>
+  <text x="50" y="96" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="62" font-weight="800" letter-spacing="0">AI</text>
+</svg>
