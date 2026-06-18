@@ -16,7 +16,10 @@ export default defineConfig({
 					lang: 'ja',
 				},
 			},
-			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/prnszz/AI-daily-news' }],
+			social: [
+				{ icon: 'github', label: 'GitHub', href: 'https://github.com/prnszz/AI-daily-news' },
+				{ icon: 'x.com', label: 'X', href: 'https://x.com/AITLND' },
+			],
 			sidebar: [
 				{
 					label: 'Daily',
