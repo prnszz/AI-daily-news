@@ -8,7 +8,8 @@
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "podcast:audio": "node script/generate-podcast-audio.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.40.0",
