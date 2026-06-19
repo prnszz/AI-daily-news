@@ -302,54 +302,64 @@ function forcedCaptions(cp, charTime, durationMs) {
 		.filter((c) => c.text);
 }
 
-// Anchor each topic to where its distinctive keyword is spoken in the script.
+// Anchor each topic to where it is spoken, then ORDER cards by spoken time.
+// The published Markdown may list topics in a different order than the
+// narration (e.g. by category), so we must not assume the two orders match.
 function anchorTopics(topics, cp, charTime, durationMs) {
 	const lower = cp.join('').toLowerCase();
 	const n = topics.length;
-	const matomeIdx = cp.join('').indexOf('まとめ');
+	const matomeIdx = lower.indexOf('まとめ');
 	const outroStartMs = matomeIdx >= 0 ? Math.round(charTime(matomeIdx)) : Math.round(durationMs * 0.9);
 	const lastBodyIdx = matomeIdx >= 0 ? matomeIdx : cp.length;
 
-	// 1) locate keywords in script order (cursor prevents matching earlier mentions)
-	let cursor = 0;
-	const pos = [];
-	for (let i = 0; i < n; i++) {
-		const kws = (topics[i].heading.match(/[A-Za-z0-9][A-Za-z0-9.\-]{1,}/g) || [])
-			.map((k) => k.toLowerCase())
-			.filter((k) => !STOP_TOKENS.has(k));
-		let best = -1;
-		for (const k of kws) {
-			const p = lower.indexOf(k, cursor);
-			if (p >= 0 && (best < 0 || p < best)) best = p;
+	const occurrences = (k) => {
+		let c = 0;
+		let i = 0;
+		while ((i = lower.indexOf(k, i)) >= 0) {
+			c++;
+			i += k.length;
 		}
-		if (best >= 0) {
-			pos.push(best);
-			cursor = best + 1;
-		} else {
-			pos.push(null);
-		}
-	}
-	// 2) fill misses by interpolating in character space
-	for (let i = 0; i < n; i++) {
-		if (pos[i] == null) {
-			const prev = i > 0 ? pos[i - 1] : 0;
-			let j = i + 1;
-			while (j < n && pos[j] == null) j++;
-			const next = j < n && pos[j] != null ? pos[j] : lastBodyIdx;
-			pos[i] = Math.round(prev + (next - prev) / (j - i + 1));
-		}
-	}
-	for (let i = 1; i < n; i++) if (pos[i] <= pos[i - 1]) pos[i] = pos[i - 1] + 1;
+		return c;
+	};
 
-	// 3) char positions → ms, then enforce ordering + min gap
-	const ms = pos.map((p) => Math.round(charTime(p)));
+	// 1) For each topic, pick its MOST distinctive keyword (rarest, then longest)
+	//    and take that keyword's position anywhere in the script.
+	const charPos = topics.map((t) => {
+		const cands = (t.heading.match(/[A-Za-z0-9][A-Za-z0-9.\-]{1,}/g) || [])
+			.map((k) => k.toLowerCase())
+			.filter((k) => !STOP_TOKENS.has(k))
+			.map((k) => ({ k, f: occurrences(k) }))
+			.filter((x) => x.f > 0);
+		if (!cands.length) return null;
+		cands.sort((a, b) => a.f - b.f || b.k.length - a.k.length);
+		return lower.indexOf(cands[0].k);
+	});
+
+	// 2) Fill any topic without a findable keyword by interpolating between its
+	//    Markdown neighbours (rare; keeps it in a sensible spot).
+	for (let i = 0; i < n; i++) {
+		if (charPos[i] == null) {
+			const prev = i > 0 && charPos[i - 1] != null ? charPos[i - 1] : 0;
+			let j = i + 1;
+			while (j < n && charPos[j] == null) j++;
+			const next = j < n && charPos[j] != null ? charPos[j] : lastBodyIdx;
+			charPos[i] = Math.round(prev + (next - prev) / (j - i + 1));
+		}
+	}
+
+	// 3) Reorder cards by spoken position (narration order, NOT Markdown order).
+	const order = [...topics.keys()].sort((a, b) => charPos[a] - charPos[b]);
+	const ordered = order.map((idx) => topics[idx]);
+	const ms = order.map((idx) => Math.round(charTime(charPos[idx])));
+
+	// 4) Enforce ordering + a minimum on-screen gap, kept before the outro.
 	for (let i = 0; i < n; i++) {
 		const floor = i > 0 ? ms[i - 1] + MIN_GAP_MS : 0;
 		ms[i] = Math.min(Math.max(ms[i], floor), outroStartMs - (n - i) * MIN_GAP_MS);
 	}
 	for (let i = 1; i < n; i++) if (ms[i] <= ms[i - 1]) ms[i] = ms[i - 1] + MIN_GAP_MS;
 
-	return topics.map((t, i) => ({
+	return ordered.map((t, i) => ({
 		category: t.category,
 		heading: t.heading,
 		summary: t.summary,

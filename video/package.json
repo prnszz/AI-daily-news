@@ -6,7 +6,8 @@
   "scripts": {
     "build-data": "node scripts/build-data.mjs",
     "studio": "remotion studio",
-    "render": "node scripts/render.mjs"
+    "render": "node scripts/render.mjs",
+    "publish-assets": "node scripts/publish-assets.mjs"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.0",
