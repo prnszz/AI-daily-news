@@ -1,5 +1,9 @@
 # build output
 dist/
+# generated video (YouTube artifacts + intermediate frames)
+out/
+# remotion generated caption data (re-creatable via pnpm build-data)
+video/data/
 # generated types
 .astro/
 .claude/

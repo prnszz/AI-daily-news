@@ -1,0 +1,6 @@
+# Isolated workspace root for the Remotion video project (kept separate from the
+# Astro app's deps). pnpm v11 reads build-script approvals from here.
+allowBuilds:
+  esbuild: true
+onlyBuiltDependencies:
+  - esbuild
