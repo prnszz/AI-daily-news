@@ -8,9 +8,11 @@
 // known script via an LCS so every caption shows the correct words at the moment
 // they are actually spoken — Whisper mis-recognitions (agent→エージャント etc.)
 // never reach the screen. Topic cards ride the SAME forced-aligned timeline: each
-// card is anchored to where its topic is introduced (matched on the heading's
-// distinctive Latin AND katakana keywords, searched monotonically in narration
-// order) and snapped to that sentence's start, so cards flip in on cue.
+// card pins to where its topic is introduced. Preferred path is an explicit anchor
+// in the podcast frontmatter ("<heading key> :: <exact opening sentence>") matched
+// as a substring — zero guessing. Without anchors it falls back to a keyword
+// heuristic (distinctive Latin/katakana token, monotonic search). Either way the
+// position is snapped to its sentence start so cards flip in on cue.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -107,6 +109,9 @@ function loadDotEnv(envPath) {
 	}
 }
 
+const unquote = (v) =>
+	(v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")) ? v.slice(1, -1) : v;
+
 function parseFrontmatter(md) {
 	if (!md.startsWith('---\n') && !md.startsWith('---\r\n')) return { data: {}, body: md };
 	const nl = md.startsWith('---\r\n') ? '\r\n' : '\n';
@@ -114,14 +119,28 @@ function parseFrontmatter(md) {
 	const end = md.indexOf(marker, 3);
 	if (end === -1) throw new Error('Unterminated frontmatter');
 	const data = {};
+	let listKey = null; // a "key:" with empty value, collecting following "- item" lines
 	for (const line of md.slice(4, end).split(/\r?\n/)) {
 		const t = line.trim();
 		if (!t || t.startsWith('#')) continue;
+		if (listKey && t.startsWith('- ')) {
+			data[listKey].push(unquote(t.slice(2).trim()));
+			continue;
+		}
 		const c = t.indexOf(':');
-		if (c === -1) continue;
-		let v = t.slice(c + 1).trim();
-		if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-		data[t.slice(0, c).trim()] = v;
+		if (c === -1) {
+			listKey = null;
+			continue;
+		}
+		const key = t.slice(0, c).trim();
+		const v = t.slice(c + 1).trim();
+		if (v === '') {
+			data[key] = []; // a simple YAML list may follow on subsequent "- " lines
+			listKey = key;
+			continue;
+		}
+		listKey = null;
+		data[key] = unquote(v);
 	}
 	return { data, body: md.slice(end + marker.length) };
 }
@@ -328,7 +347,15 @@ function forcedCaptions(cp, charTime, durationMs) {
 // Anchor each topic to where it is spoken, then ORDER cards by spoken time.
 // The published Markdown may list topics in a different order than the
 // narration (e.g. by category), so we must not assume the two orders match.
-function anchorTopics(topics, cp, charTime, durationMs) {
+//
+// Two anchoring strategies, in order of trust:
+//   1. Explicit anchors (podcast frontmatter `anchors: ["<heading key> :: <exact
+//      opening sentence>", ...]`). The cue is matched as an exact substring of the
+//      script, so the card pins to the topic's first spoken line with zero
+//      guessing. This is the recommended path — author it when writing the script.
+//   2. Keyword fallback (rarest distinctive Latin/katakana token, monotonic search)
+//      for any topic without a usable anchor, or days with no anchors at all.
+function anchorTopics(topics, cp, charTime, durationMs, topicAnchors) {
 	const lower = cp.join('').toLowerCase();
 	const n = topics.length;
 	const matomeIdx = lower.indexOf('まとめ');
@@ -392,6 +419,33 @@ function anchorTopics(topics, cp, charTime, durationMs) {
 		cursor = Math.max(cursor, p);
 	}
 
+	// 2b) Explicit anchor overrides. "<heading key> :: <opening cue>" pins a topic
+	//     to the exact sentence that introduces it — an exact substring match on the
+	//     same forced-aligned timeline, which can't be fooled by duplicate keywords.
+	//     Topics without an anchor keep their keyword position (steps 1-2).
+	let anchored = 0;
+	if (Array.isArray(topicAnchors)) {
+		for (const a of topicAnchors) {
+			const sep = String(a).indexOf('::');
+			if (sep < 0) continue;
+			const key = a.slice(0, sep).trim().toLowerCase();
+			const cue = a.slice(sep + 2).trim().toLowerCase();
+			if (!key || !cue) continue;
+			const matches = [...topics.keys()].filter((i) => topics[i].heading.toLowerCase().includes(key));
+			if (matches.length !== 1) {
+				process.stderr.write(`  ! anchor key "${key}" matched ${matches.length} topics — ignored\n`);
+				continue;
+			}
+			const at = lower.indexOf(cue);
+			if (at < 0) {
+				process.stderr.write(`  ! anchor cue not found in script: "${cue.slice(0, 24)}…" — ignored\n`);
+				continue;
+			}
+			pos[matches[0]] = snapToSentence(at);
+			anchored++;
+		}
+	}
+
 	// 3) Final order + times from the refined positions.
 	const finalOrder = [...topics.keys()].sort((a, b) => pos[a] - pos[b]);
 	const ordered = finalOrder.map((idx) => topics[idx]);
@@ -404,7 +458,7 @@ function anchorTopics(topics, cp, charTime, durationMs) {
 	}
 	for (let i = 1; i < n; i++) if (ms[i] <= ms[i - 1]) ms[i] = ms[i - 1] + MIN_GAP_MS;
 
-	return ordered.map((t, i) => ({
+	const list = ordered.map((t, i) => ({
 		category: t.category,
 		heading: t.heading,
 		summary: t.summary,
@@ -413,6 +467,7 @@ function anchorTopics(topics, cp, charTime, durationMs) {
 		startMs: ms[i],
 		endMs: i < n - 1 ? ms[i + 1] : outroStartMs,
 	}));
+	return { list, anchored };
 }
 
 async function main() {
@@ -465,7 +520,7 @@ async function main() {
 	}
 
 	const captions = forcedCaptions(cp, charTime, durationMs);
-	const topics = anchorTopics(rawTopics, cp, charTime, durationMs);
+	const { list: topics, anchored } = anchorTopics(rawTopics, cp, charTime, durationMs, podcast.data.anchors);
 
 	const data = {
 		date: opts.date,
@@ -484,7 +539,7 @@ async function main() {
 	fs.writeFileSync(outFile, JSON.stringify(data, null, 2));
 	process.stdout.write(
 		`Wrote ${path.relative(REPO_ROOT, outFile)}\n` +
-			`  duration: ${durationSec.toFixed(1)}s  topics: ${topics.length}  captions: ${captions.length}\n` +
+			`  duration: ${durationSec.toFixed(1)}s  topics: ${topics.length} (${anchored} anchored, ${topics.length - anchored} keyword)  captions: ${captions.length}\n` +
 			`  timing: ${timingMode}\n`,
 	);
 }
