@@ -7,8 +7,10 @@
 // only the *timing* from Whisper. Whisper word timestamps are aligned to the
 // known script via an LCS so every caption shows the correct words at the moment
 // they are actually spoken — Whisper mis-recognitions (agent→エージャント etc.)
-// never reach the screen. Topic cards are anchored by locating each topic's
-// keyword in the clean script and mapping that position onto the same timeline.
+// never reach the screen. Topic cards ride the SAME forced-aligned timeline: each
+// card is anchored to where its topic is introduced (matched on the heading's
+// distinctive Latin AND katakana keywords, searched monotonically in narration
+// order) and snapped to that sentence's start, so cards flip in on cue.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,11 +28,32 @@ const X_HANDLE = '@AITLND';
 const FPS = 30;
 const ACCENTS = ['#2dd4bf', '#67e8f9', '#a3e635'];
 const MIN_GAP_MS = 4000;
+// A keyword used more than this many times in the script is too ambiguous to mark
+// a topic's introduction precisely; we still keep it as a last-resort anchor.
+const DISTINCTIVE_CAP = 3;
 // Generic tokens that appear in many headings/the intro; never anchor on these.
 const STOP_TOKENS = new Set([
 	'ai', 'api', 'llm', 'ml', 'gpt', 'app', 'apps', 'the', 'and', 'for', 'ios', 'ui', 'os',
 	'one', 'sdk', 'agent', 'agents', 'framework', 'video', 'data', 'model', 'models', 'tasks', 'stack',
 ]);
+// Generic katakana that shows up in many headings; never anchor on these.
+const KATAKANA_STOP = new Set([
+	'アップデート', 'プロダクト', 'ツール', 'モデル', 'リリース', 'サービス', 'ユーザー',
+	'オープン', 'データ', 'エージェント', 'コーディング', 'アクセス', 'タスク',
+]);
+
+// Distinctive anchor candidates for a heading: Latin/number tokens AND katakana
+// runs (proper nouns like ホワイトハウス / セッション). Headings are mostly Japanese,
+// so Latin-only extraction would leave many topics with no usable anchor.
+function topicKeywords(heading) {
+	const latin = (heading.match(/[A-Za-z0-9][A-Za-z0-9.\-]{1,}/g) || [])
+		.map((k) => k.toLowerCase())
+		.filter((k) => !STOP_TOKENS.has(k));
+	const kata = (heading.match(/[゠-ヿ]{3,}/g) || [])
+		.filter((k) => !KATAKANA_STOP.has(k))
+		.map((k) => k.toLowerCase());
+	return [...new Set([...latin, ...kata])];
+}
 
 function usage() {
 	return `Usage:
@@ -322,35 +345,57 @@ function anchorTopics(topics, cp, charTime, durationMs) {
 		return c;
 	};
 
-	// 1) For each topic, pick its MOST distinctive keyword (rarest, then longest)
-	//    and take that keyword's position anywhere in the script.
-	const charPos = topics.map((t) => {
-		const cands = (t.heading.match(/[A-Za-z0-9][A-Za-z0-9.\-]{1,}/g) || [])
-			.map((k) => k.toLowerCase())
-			.filter((k) => !STOP_TOKENS.has(k))
-			.map((k) => ({ k, f: occurrences(k) }))
-			.filter((x) => x.f > 0);
-		if (!cands.length) return null;
-		cands.sort((a, b) => a.f - b.f || b.k.length - a.k.length);
-		return lower.indexOf(cands[0].k);
-	});
-
-	// 2) Fill any topic without a findable keyword by interpolating between its
-	//    Markdown neighbours (rare; keeps it in a sensible spot).
-	for (let i = 0; i < n; i++) {
-		if (charPos[i] == null) {
-			const prev = i > 0 && charPos[i - 1] != null ? charPos[i - 1] : 0;
-			let j = i + 1;
-			while (j < n && charPos[j] == null) j++;
-			const next = j < n && charPos[j] != null ? charPos[j] : lastBodyIdx;
-			charPos[i] = Math.round(prev + (next - prev) / (j - i + 1));
+	// Sentence boundaries — the SAME grid the captions snap to. Snapping a card to
+	// the start of the sentence that introduces its topic makes it flip in exactly
+	// when that line begins, instead of a beat later when the keyword is uttered.
+	const chunks = chunkScript(cp);
+	const snapToSentence = (idx) => {
+		let best = 0;
+		for (const c of chunks) {
+			if (c.start <= idx) best = c.start;
+			else break;
 		}
+		return best;
+	};
+
+	// Each topic's anchor candidates, ranked rarest-first (then longest = most
+	// specific). Both Latin and katakana keywords are considered, so a heading
+	// like "ホワイトハウスとAnthropicの協議…" anchors on ホワイトハウス (appears once)
+	// rather than the very common Anthropic.
+	const keywordsOf = topics.map((t) =>
+		topicKeywords(t.heading)
+			.map((k) => ({ k, f: occurrences(k) }))
+			.filter((x) => x.f > 0)
+			.sort((a, b) => a.f - b.f || b.k.length - a.k.length),
+	);
+
+	// 1) Coarse ordering: each topic's rarest keyword, first occurrence anywhere.
+	const coarse = keywordsOf.map((ks) => (ks.length ? lower.indexOf(ks[0].k) : lastBodyIdx));
+	const order = [...topics.keys()].sort((a, b) => coarse[a] - coarse[b]);
+
+	// 2) Refine in narration order with a MONOTONIC cursor: resolve each topic's
+	//    keywords only at/after the previous topic's position, so an early
+	//    duplicate mention (e.g. an earlier "Anthropic") can't steal a later card.
+	//    Among the distinctive keywords found after the cursor, take the EARLIEST
+	//    so the card lands on the topic's first mention, not a later restatement.
+	const pos = new Array(n).fill(null);
+	let cursor = 0;
+	for (const idx of order) {
+		const ks = keywordsOf[idx];
+		const distinctive = ks.filter((x) => x.f <= DISTINCTIVE_CAP);
+		const pool = distinctive.length ? distinctive : ks;
+		const hits = pool.map((x) => lower.indexOf(x.k, cursor)).filter((p) => p >= 0);
+		let p = hits.length ? Math.min(...hits) : ks.length ? lower.indexOf(ks[0].k) : cursor;
+		if (p < 0) p = cursor;
+		p = snapToSentence(p);
+		pos[idx] = p;
+		cursor = Math.max(cursor, p);
 	}
 
-	// 3) Reorder cards by spoken position (narration order, NOT Markdown order).
-	const order = [...topics.keys()].sort((a, b) => charPos[a] - charPos[b]);
-	const ordered = order.map((idx) => topics[idx]);
-	const ms = order.map((idx) => Math.round(charTime(charPos[idx])));
+	// 3) Final order + times from the refined positions.
+	const finalOrder = [...topics.keys()].sort((a, b) => pos[a] - pos[b]);
+	const ordered = finalOrder.map((idx) => topics[idx]);
+	const ms = finalOrder.map((idx) => Math.round(charTime(pos[idx])));
 
 	// 4) Enforce ordering + a minimum on-screen gap, kept before the outro.
 	for (let i = 0; i < n; i++) {
