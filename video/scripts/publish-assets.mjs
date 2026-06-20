@@ -29,7 +29,7 @@ if (!fs.existsSync(dataFile)) {
 	process.exit(1);
 }
 const d = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
-const outDir = path.join(REPO_ROOT, 'out', 'video', 'daily');
+const outDir = path.join(REPO_ROOT, 'out', 'video', 'daily', dateArg);
 fs.mkdirSync(outDir, { recursive: true });
 
 const clock = (ms) => {
@@ -94,12 +94,12 @@ const description = [
 	'※ナレーションは音声合成（AI音声）で生成しています。',
 ].join('\n');
 
-fs.writeFileSync(path.join(outDir, `${dateArg}.chapters.txt`), chapters + '\n');
-fs.writeFileSync(path.join(outDir, `${dateArg}.srt`), srt);
-fs.writeFileSync(path.join(outDir, `${dateArg}.description.txt`), description + '\n');
+fs.writeFileSync(path.join(outDir, 'chapters.txt'), chapters + '\n');
+fs.writeFileSync(path.join(outDir, 'captions.srt'), srt);
+fs.writeFileSync(path.join(outDir, 'description.txt'), description + '\n');
 
 // --- thumbnail: render the dedicated Thumbnail composition (1280x720) ---
-const thumb = path.join(outDir, `${dateArg}.thumb.png`);
+const thumb = path.join(outDir, 'thumbnail.png');
 const r = spawnSync('npx', ['remotion', 'still', 'src/index.ts', 'Thumbnail', thumb, `--props=${dataFile}`], {
 	cwd: PROJECT,
 	encoding: 'utf8',
@@ -107,10 +107,10 @@ const r = spawnSync('npx', ['remotion', 'still', 'src/index.ts', 'Thumbnail', th
 const thumbNote = r.status === 0 ? path.relative(REPO_ROOT, thumb) : `remotion still failed: ${r.stderr || r.stdout}`;
 
 process.stdout.write(
-	`Wrote:\n` +
-		`  ${path.relative(REPO_ROOT, path.join(outDir, `${dateArg}.chapters.txt`))}\n` +
-		`  ${path.relative(REPO_ROOT, path.join(outDir, `${dateArg}.srt`))}  (${d.captions.length} cues)\n` +
-		`  ${path.relative(REPO_ROOT, path.join(outDir, `${dateArg}.description.txt`))}\n` +
+	`Wrote into ${path.relative(REPO_ROOT, outDir)}/ :\n` +
+		`  chapters.txt\n` +
+		`  captions.srt  (${d.captions.length} cues)\n` +
+		`  description.txt\n` +
 		`  thumbnail: ${thumbNote}\n\n` +
 		`--- chapters ---\n${chapters}\n`,
 );

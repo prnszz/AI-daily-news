@@ -15,7 +15,18 @@ src/content/docs/daily/<date>.md   (トピック)        public/audio/daily/<dat
                                    ↓
                         video/data/<date>.json   (1日分を表す唯一の JSON)
                                    ↓
-                        Remotion (src/) ── npx remotion render ──→ out/video/daily/<date>.mp4
+                        Remotion (src/) ── render / publish-assets ──→ out/video/daily/<date>/
+```
+
+1日分の成果物は **日付フォルダ 1 つ**にまとまる（`research/daily/<date>/` と同じ流儀）:
+
+```
+out/video/daily/<date>/
+├── video.mp4         # 本編（render）
+├── thumbnail.png     # YouTube サムネイル 1280x720（publish-assets）
+├── captions.srt      # 字幕（publish-assets）
+├── chapters.txt      # 概要欄に貼るチャプター（publish-assets）
+└── description.txt   # 概要欄テンプレ（publish-assets）
 ```
 
 ## このプロジェクトの位置づけ
@@ -45,11 +56,14 @@ pnpm build-data -- --date 2026-06-18
 pnpm build-data -- --date 2026-06-18 --no-whisper   # API を使わず台本から等間隔で割り当て
 pnpm build-data -- --date 2026-06-18 --force        # 既存 data を上書き
 
-# 2) レンダリング（out/video/daily/<date>.mp4 へ出力）
+# 2) レンダリング（out/video/daily/<date>/video.mp4 へ出力）
 pnpm render -- --date 2026-06-18
 pnpm render -- --date 2026-06-18 --concurrency=4     # 余分な引数は remotion render に渡る
 
-# 3) プレビュー / 字幕・レイアウトの調整
+# 3) 公開素材（同じ日付フォルダに chapters / srt / description / thumbnail を生成）
+pnpm publish-assets -- --date 2026-06-18
+
+# 4) プレビュー / 字幕・レイアウトの調整
 pnpm studio
 ```
 
@@ -58,11 +72,13 @@ pnpm studio
 
 ## 構成
 
-- `src/DailyDigest.tsx` — 全体の合成（音声・背景・ヘッダ・カバー・各トピック・字幕・進捗バー）
+- `src/DailyDigest.tsx` — 本編の合成（音声・背景・ヘッダ・カバー・各トピック・字幕・進捗バー）
+- `src/Thumbnail.tsx` — サムネイル合成（1280x720、字幕なし・頭条大字）
 - `src/components/` — 各シーン / 部品
 - `src/theme.ts` — ブランド配色とフォント（`src/assets/ai-trend-logo.svg` 由来）
-- `scripts/build-data.mjs` — Markdown 解析 + Whisper + トピックの時刻割り当て
-- `scripts/render.mjs` — `remotion render` の薄いラッパ（出力先を `out/` に固定）
+- `scripts/build-data.mjs` — Markdown 解析 + Whisper + 強制アライメント → `data/<date>.json`
+- `scripts/render.mjs` — `remotion render` の薄いラッパ（→ `out/video/daily/<date>/video.mp4`）
+- `scripts/publish-assets.mjs` — chapters / srt / description / thumbnail を日付フォルダに生成
 
 ## 既知の制約 / 次の改善候補
 

@@ -35,7 +35,7 @@ if (!fs.existsSync(dataFile)) {
 	process.exit(1);
 }
 
-const output = path.join(REPO_ROOT, 'out', 'video', 'daily', `${date}.mp4`);
+const output = path.join(REPO_ROOT, 'out', 'video', 'daily', date, 'video.mp4');
 fs.mkdirSync(path.dirname(output), { recursive: true });
 
 const args = ['remotion', 'render', 'src/index.ts', 'DailyDigest', output, `--props=${dataFile}`, ...passthrough];
