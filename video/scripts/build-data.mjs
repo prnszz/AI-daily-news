@@ -17,12 +17,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const DATA_DIR = path.resolve(__dirname, '..', 'data');
+// Whisper word-timestamps cached by audio content hash. Re-running build-data (e.g.
+// to iterate on anchors) then costs no API call as long as the .mp3 is unchanged;
+// regenerating the audio changes the hash and transparently re-transcribes.
+const WHISPER_CACHE_DIR = path.resolve(DATA_DIR, '.whisper-cache');
 
 const BRAND = 'AIトレンド Digest';
 const SITE_URL = 'https://prnszz.github.io/AI-daily-news';
@@ -68,19 +73,21 @@ Options:
   --input <path>        Podcast Markdown (default: platforms/podcast/daily/<date>.md).
   --audio <path>        Narration MP3 (default: frontmatter audio: or public/audio/daily/<date>.mp3).
   --no-whisper          Skip Whisper; time the script proportionally by character.
+  --no-cache            Ignore the Whisper cache and re-transcribe.
   --force               Overwrite an existing data file.
   --help
 `;
 }
 
 function parseArgs(argv) {
-	const o = { date: undefined, input: undefined, audio: undefined, whisper: true, force: false, help: false };
+	const o = { date: undefined, input: undefined, audio: undefined, whisper: true, cache: true, force: false, help: false };
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
 		if (a === '--') continue;
 		else if (a === '--help' || a === '-h') o.help = true;
 		else if (a === '--force') o.force = true;
 		else if (a === '--no-whisper') o.whisper = false;
+		else if (a === '--no-cache') o.cache = false;
 		else if (a.startsWith('--date=')) o.date = a.slice(7);
 		else if (a === '--date') o.date = argv[++i];
 		else if (a.startsWith('--input=')) o.input = a.slice(8);
@@ -225,6 +232,23 @@ async function whisperWords(audioPath, apiKey) {
 	if (!res.ok) throw new Error(`Whisper failed: ${res.status} ${res.statusText}\n${await res.text()}`);
 	const json = await res.json();
 	return Array.isArray(json.words) ? json.words : [];
+}
+
+// Whisper word-timestamps, cached by the audio file's content hash so repeated
+// build-data runs (anchor iteration, etc.) don't re-pay the API. `useCache=false`
+// (--no-cache) always re-transcribes and refreshes the cache.
+async function cachedWhisperWords(audioPath, apiKey, useCache) {
+	const hash = crypto.createHash('sha256').update(fs.readFileSync(audioPath)).digest('hex').slice(0, 16);
+	const cacheFile = path.join(WHISPER_CACHE_DIR, `${hash}.json`);
+	if (useCache && fs.existsSync(cacheFile)) {
+		process.stdout.write(`Using cached Whisper words (${hash}).\n`);
+		return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+	}
+	process.stdout.write(`Transcribing ${path.relative(REPO_ROOT, audioPath)} with Whisper (word timestamps)...\n`);
+	const words = await whisperWords(audioPath, apiKey);
+	fs.mkdirSync(WHISPER_CACHE_DIR, { recursive: true });
+	fs.writeFileSync(cacheFile, JSON.stringify(words));
+	return words;
 }
 
 // --- forced alignment ---------------------------------------------------------
@@ -507,8 +531,7 @@ async function main() {
 	if (opts.whisper) {
 		const apiKey = process.env.OPENAI_API_KEY;
 		if (!apiKey) throw new Error('OPENAI_API_KEY missing (add to .env) or pass --no-whisper.');
-		process.stdout.write(`Transcribing ${audioRel} with Whisper (word timestamps)...\n`);
-		const words = await whisperWords(audioPath, apiKey);
+		const words = await cachedWhisperWords(audioPath, apiKey, opts.cache);
 		const anchors = words.length ? lcsAnchors(scriptCharStream(cp), whisperCharStream(words)) : [];
 		charTime = makeCharTime(anchors, cp.length, durationMs);
 		timingMode = anchors.length
@@ -537,11 +560,22 @@ async function main() {
 
 	fs.mkdirSync(DATA_DIR, { recursive: true });
 	fs.writeFileSync(outFile, JSON.stringify(data, null, 2));
+	const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 	process.stdout.write(
 		`Wrote ${path.relative(REPO_ROOT, outFile)}\n` +
 			`  duration: ${durationSec.toFixed(1)}s  topics: ${topics.length} (${anchored} anchored, ${topics.length - anchored} keyword)  captions: ${captions.length}\n` +
 			`  timing: ${timingMode}\n`,
 	);
+	// Quality-gate aid: eyeball that cards track the narration and captions are clean.
+	process.stdout.write('  topic cards (spoken order):\n');
+	for (const t of topics) process.stdout.write(`    ${mmss(t.startMs).padStart(5)}  ${t.heading}\n`);
+	process.stdout.write('  first captions:\n');
+	for (const c of captions.slice(0, 3)) process.stdout.write(`    ${mmss(c.startMs).padStart(5)}  ${c.text}\n`);
+	if (anchored < topics.length && Array.isArray(podcast.data.anchors) && podcast.data.anchors.length) {
+		process.stderr.write(
+			`  ! ${topics.length - anchored} topic(s) fell back to keyword anchoring — check the anchors list for typos.\n`,
+		);
+	}
 }
 
 main().catch((e) => {
