@@ -1,10 +1,10 @@
 import { AbsoluteFill, Audio, Sequence, staticFile, useVideoConfig } from 'remotion';
 import { Background } from './components/Background';
-import { Captions } from './components/Captions';
 import { Closing } from './components/Closing';
 import { Cover } from './components/Cover';
 import { Header } from './components/Header';
 import { ProgressBar } from './components/ProgressBar';
+import { Recap } from './components/Recap';
 import { TopicScene } from './components/TopicScene';
 import type { DailyDigestProps } from './types';
 
@@ -41,14 +41,30 @@ export const DailyDigest = (props: DailyDigestProps) => {
 				</Sequence>
 			))}
 
-			{/* Outro */}
-			<Sequence from={ms(lastEnd)} durationInFrames={Math.max(1, durationInFrames - ms(lastEnd))} name="closing">
-				<Closing brand={props.brand} date={props.date} siteUrl={props.siteUrl} xHandle={props.xHandle} />
-			</Sequence>
+			{/* Outro: a recap of the day's topics, then a short thanks card timed to the
+			    "詳細は…ご覧ください" line so the site link lands with that narration. */}
+			{(() => {
+				const outroFrom = ms(lastEnd);
+				const detail = (props.captions ?? []).find(
+					(c) => c.startMs > lastEnd && (c.text.includes('詳細') || c.text.includes('ご覧')),
+				);
+				const closingFrom = detail
+					? Math.max(outroFrom + 1, ms(detail.startMs))
+					: outroFrom + Math.round((durationInFrames - outroFrom) * 0.72);
+				return (
+					<>
+						<Sequence from={outroFrom} durationInFrames={Math.max(1, closingFrom - outroFrom)} name="recap">
+							<Recap topics={topics} date={props.date} />
+						</Sequence>
+						<Sequence from={closingFrom} durationInFrames={Math.max(1, durationInFrames - closingFrom)} name="closing">
+							<Closing brand={props.brand} date={props.date} siteUrl={props.siteUrl} xHandle={props.xHandle} />
+						</Sequence>
+					</>
+				);
+			})()}
 
-			{/* Precise captions ride on top of every scene */}
-			<Captions captions={props.captions ?? []} fps={fps} />
-
+			{/* No burned-in captions: captions.srt is uploaded to YouTube as a
+			    toggleable subtitle track, so on-screen content stays unobstructed. */}
 			<ProgressBar />
 		</AbsoluteFill>
 	);

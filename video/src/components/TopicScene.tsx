@@ -2,6 +2,10 @@ import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } fr
 import { COLORS, FONT_FAMILY } from '../theme';
 import type { Topic } from '../types';
 
+// Approx rendered width in "CJK units": fullwidth glyphs ≈ 1, ASCII/halfwidth ≈ 0.55.
+// Lets us auto-shrink the font so long text always fits instead of clamping it to "…".
+const visualWidth = (s: string) => [...s].reduce((w, ch) => w + (/[ -~｡-ﾟ]/.test(ch) ? 0.55 : 1), 0);
+
 export const TopicScene = ({ topic, index, total }: { topic: Topic; index: number; total: number }) => {
 	const frame = useCurrentFrame();
 	const { fps } = useVideoConfig();
@@ -9,6 +13,14 @@ export const TopicScene = ({ topic, index, total }: { topic: Topic; index: numbe
 	const x = interpolate(enter, [0, 1], [70, 0]);
 	const opacity = interpolate(frame, [0, 12], [0, 1], { extrapolateRight: 'clamp' });
 	const badgePop = spring({ frame, fps, config: { damping: 12, mass: 0.4 } });
+
+	// Long headings shrink so they stay within a couple of lines instead of clamping to "…".
+	const headingW = visualWidth(topic.heading);
+	const headingFont = headingW > 40 ? 50 : headingW > 30 ? 58 : 68;
+	// Summary is authored concise upstream (podcast `cards:` / first sentence). Auto-shrink
+	// the font so it always fits (~4.5 lines), with line-clamp as a final safety net.
+	const summary = topic.summary ?? '';
+	const summaryFont = Math.max(32, Math.min(40, Math.floor((4.5 * 1500) / Math.max(1, visualWidth(summary)))));
 
 	return (
 		<AbsoluteFill style={{ justifyContent: 'center', padding: '0 110px 120px' }}>
@@ -40,13 +52,13 @@ export const TopicScene = ({ topic, index, total }: { topic: Topic; index: numbe
 				<div
 					style={{
 						fontFamily: FONT_FAMILY,
-						fontSize: 68,
+						fontSize: headingFont,
 						fontWeight: 800,
 						color: COLORS.text,
 						lineHeight: 1.28,
 						maxWidth: 1500,
 						display: '-webkit-box',
-						WebkitLineClamp: 3,
+						WebkitLineClamp: 4,
 						WebkitBoxOrient: 'vertical',
 						overflow: 'hidden',
 					}}
@@ -56,21 +68,21 @@ export const TopicScene = ({ topic, index, total }: { topic: Topic; index: numbe
 
 				<div style={{ width: 130, height: 6, borderRadius: 3, background: topic.accent, margin: '38px 0' }} />
 
-				{/* summary */}
+				{/* summary — concise upstream + auto-shrink so it fits without an ellipsis */}
 				<div
 					style={{
 						fontFamily: FONT_FAMILY,
-						fontSize: 40,
+						fontSize: summaryFont,
 						color: COLORS.subtle,
 						lineHeight: 1.5,
 						maxWidth: 1500,
 						display: '-webkit-box',
-						WebkitLineClamp: 5,
+						WebkitLineClamp: 6,
 						WebkitBoxOrient: 'vertical',
 						overflow: 'hidden',
 					}}
 				>
-					{topic.summary}
+					{summary}
 				</div>
 			</div>
 

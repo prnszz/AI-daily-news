@@ -203,6 +203,29 @@ function parseDaily(body) {
 	return { agenda, topics };
 }
 
+// Resolve `cards: ["<heading key> :: <concise line>", ...]` (podcast frontmatter)
+// to a map of topic index → card text. Same key matching as anchors: the key must
+// uniquely identify one heading. Lets each card show a tight, self-contained summary
+// instead of the full body paragraph.
+function resolveCards(topics, cards) {
+	const map = new Map();
+	if (!Array.isArray(cards)) return map;
+	for (const c of cards) {
+		const sep = String(c).indexOf('::');
+		if (sep < 0) continue;
+		const key = c.slice(0, sep).trim().toLowerCase();
+		const text = c.slice(sep + 2).trim();
+		if (!key || !text) continue;
+		const matches = [...topics.keys()].filter((i) => topics[i].heading.toLowerCase().includes(key));
+		if (matches.length !== 1) {
+			process.stderr.write(`  ! card key "${key}" matched ${matches.length} topics — ignored\n`);
+			continue;
+		}
+		map.set(matches[0], text);
+	}
+	return map;
+}
+
 function ffprobeDuration(audioPath) {
 	const r = spawnSync(
 		'ffprobe',
@@ -516,6 +539,25 @@ async function main() {
 	const { agenda, topics: rawTopics } = parseDaily(parseFrontmatter(fs.readFileSync(sourcePath, 'utf8')).body);
 	if (!rawTopics.length) throw new Error(`No topics parsed from ${sourcePath}`);
 
+	// Card text = a concise, complete line per topic. Prefer an explicit
+	// `cards: ["<heading key> :: <text>"]` from the podcast frontmatter; otherwise
+	// fall back to the body's first sentence (kept whole — never cut mid-thought).
+	// The full body still lives on the website; the card is just the visual summary.
+	const cardMap = resolveCards(rawTopics, podcast.data.cards);
+	const firstSentence = (s) => {
+		const i = s.indexOf('。');
+		return i >= 0 ? s.slice(0, i + 1) : s;
+	};
+	let carded = 0;
+	rawTopics.forEach((t, i) => {
+		if (cardMap.has(i)) {
+			t.summary = cardMap.get(i);
+			carded++;
+		} else {
+			t.summary = firstSentence(t.summary);
+		}
+	});
+
 	const audioRel = opts.audio ?? podcast.data.audio ?? `public/audio/daily/${opts.date}.mp3`;
 	const audioPath = path.join(REPO_ROOT, audioRel);
 	if (!fs.existsSync(audioPath)) throw new Error(`Audio not found: ${audioPath}`);
@@ -567,6 +609,7 @@ async function main() {
 			`  timing: ${timingMode}\n`,
 	);
 	// Quality-gate aid: eyeball that cards track the narration and captions are clean.
+	process.stdout.write(`  card text: ${carded}/${topics.length} from frontmatter, ${topics.length - carded} first-sentence fallback\n`);
 	process.stdout.write('  topic cards (spoken order):\n');
 	for (const t of topics) process.stdout.write(`    ${mmss(t.startMs).padStart(5)}  ${t.heading}\n`);
 	process.stdout.write('  first captions:\n');
