@@ -1,0 +1,20 @@
+---
+// Auto-generated list of the most recent Daily pages for the homepage.
+// Replaces the hand-maintained <LinkCard> list (prepend + trim every day).
+import { LinkCard } from '@astrojs/starlight/components';
+import { getCollection } from 'astro:content';
+
+interface Props {
+	/** How many of the most recent days to show. */
+	limit?: number;
+}
+const { limit = 8 } = Astro.props;
+// BASE_URL may or may not carry a trailing slash; normalize so we always join with one.
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const days = (await getCollection('docs', (e) => e.id.startsWith('daily/')))
+	.sort((a, b) => (a.id < b.id ? 1 : -1)) // newest first (ids are YYYY-MM-DD)
+	.slice(0, limit);
+---
+
+{days.map((d) => <LinkCard title={d.id.replace(/^daily\//, '')} href={`${base}/${d.id}/`} />)}
