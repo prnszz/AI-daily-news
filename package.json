@@ -9,7 +9,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "podcast:audio": "node script/generate-podcast-audio.mjs"
+    "podcast:audio": "node script/generate-podcast-audio.mjs",
+    "validate": "node script/validate.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.40.0",
