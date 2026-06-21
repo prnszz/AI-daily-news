@@ -3,12 +3,26 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+    # Only rebuild/redeploy when something that affects the published site
+    # changes. Video source, podcast/X drafts, research, and skills don't.
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'astro.config.mjs'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+# Serialize deploys; let an in-flight deploy finish rather than cancelling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
