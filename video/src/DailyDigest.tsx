@@ -3,7 +3,6 @@ import { Background } from './components/Background';
 import { Closing } from './components/Closing';
 import { Cover } from './components/Cover';
 import { Header } from './components/Header';
-import { ProgressBar } from './components/ProgressBar';
 import { Recap } from './components/Recap';
 import { TopicScene } from './components/TopicScene';
 import type { DailyDigestProps } from './types';
@@ -65,7 +64,6 @@ export const DailyDigest = (props: DailyDigestProps) => {
 
 			{/* No burned-in captions: captions.srt is uploaded to YouTube as a
 			    toggleable subtitle track, so on-screen content stays unobstructed. */}
-			<ProgressBar />
 		</AbsoluteFill>
 	);
 };
