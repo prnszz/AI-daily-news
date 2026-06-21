@@ -20,10 +20,16 @@ function archiveItems(dir) {
     .map((slug) => ({ label: slug, link: `/${dir}/${slug}/` }));
 }
 
+// Newest Daily page. The homepage hero points at a fixed "/daily/latest" URL
+// that redirects here, so the hero never needs a manual date edit.
+const latestDaily = archiveItems('daily')[0]?.link;
+
 // https://astro.build/config
 export default defineConfig({
   site: site.origin,
   base: site.base,
+  // Astro doesn't prefix the base onto redirect targets, so add it here.
+  redirects: latestDaily ? { '/daily/latest': `${site.base}${latestDaily}` } : {},
   integrations: [
     starlight({
       title: site.brand,
