@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { loadDotEnv, parseFrontmatter, extractScript } from '../lib/md.mjs';
 
 const DEFAULT_MODEL = 'gpt-4o-mini-tts';
 const DEFAULT_VOICE = 'marin';
@@ -108,76 +109,6 @@ function parseArgs(argv) {
 	}
 
 	return options;
-}
-
-function parseEnvValue(value) {
-	const trimmed = value.trim();
-	if (
-		(trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-		(trimmed.startsWith("'") && trimmed.endsWith("'"))
-	) {
-		return trimmed.slice(1, -1);
-	}
-	return trimmed;
-}
-
-function loadDotEnv(envPath) {
-	if (!fs.existsSync(envPath)) return;
-
-	const env = fs.readFileSync(envPath, 'utf8');
-	for (const line of env.split(/\r?\n/)) {
-		const trimmed = line.trim();
-		if (!trimmed || trimmed.startsWith('#')) continue;
-
-		const equalIndex = trimmed.indexOf('=');
-		if (equalIndex === -1) continue;
-
-		const key = trimmed.slice(0, equalIndex).trim();
-		const value = parseEnvValue(trimmed.slice(equalIndex + 1));
-		if (key && process.env[key] === undefined) {
-			process.env[key] = value;
-		}
-	}
-}
-
-function parseFrontmatter(markdown) {
-	if (!markdown.startsWith('---\n') && !markdown.startsWith('---\r\n')) {
-		return { data: {}, body: markdown };
-	}
-
-	const newline = markdown.startsWith('---\r\n') ? '\r\n' : '\n';
-	const marker = `${newline}---${newline}`;
-	const endIndex = markdown.indexOf(marker, 3);
-	if (endIndex === -1) {
-		throw new Error('Frontmatter starts with --- but has no closing --- marker');
-	}
-
-	const rawFrontmatter = markdown.slice(4, endIndex);
-	const body = markdown.slice(endIndex + marker.length);
-	const data = {};
-
-	for (const line of rawFrontmatter.split(/\r?\n/)) {
-		const trimmed = line.trim();
-		if (!trimmed || trimmed.startsWith('#')) continue;
-
-		const colonIndex = trimmed.indexOf(':');
-		if (colonIndex === -1) continue;
-
-		const key = trimmed.slice(0, colonIndex).trim();
-		const value = parseEnvValue(trimmed.slice(colonIndex + 1));
-		data[key] = value;
-	}
-
-	return { data, body };
-}
-
-function extractScript(markdownBody) {
-	const match = markdownBody.match(/^## Script\s*$/m);
-	if (!match || match.index === undefined) {
-		throw new Error('Podcast Markdown must contain a "## Script" heading');
-	}
-
-	return markdownBody.slice(match.index + match[0].length).trim();
 }
 
 function inferDateFromInput(inputPath) {

@@ -20,6 +20,7 @@ import process from 'node:process';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { loadDotEnv, parseFrontmatter, extractScript } from '../../lib/md.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -98,64 +99,6 @@ function parseArgs(argv) {
 		else throw new Error(`Unknown argument: ${a}`);
 	}
 	return o;
-}
-
-// --- tiny .env + frontmatter parsers (same conventions as the audio script) ---
-
-function loadDotEnv(envPath) {
-	if (!fs.existsSync(envPath)) return;
-	for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
-		const t = line.trim();
-		if (!t || t.startsWith('#')) continue;
-		const eq = t.indexOf('=');
-		if (eq === -1) continue;
-		const k = t.slice(0, eq).trim();
-		let v = t.slice(eq + 1).trim();
-		if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-		if (k && process.env[k] === undefined) process.env[k] = v;
-	}
-}
-
-const unquote = (v) =>
-	(v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")) ? v.slice(1, -1) : v;
-
-function parseFrontmatter(md) {
-	if (!md.startsWith('---\n') && !md.startsWith('---\r\n')) return { data: {}, body: md };
-	const nl = md.startsWith('---\r\n') ? '\r\n' : '\n';
-	const marker = `${nl}---${nl}`;
-	const end = md.indexOf(marker, 3);
-	if (end === -1) throw new Error('Unterminated frontmatter');
-	const data = {};
-	let listKey = null; // a "key:" with empty value, collecting following "- item" lines
-	for (const line of md.slice(4, end).split(/\r?\n/)) {
-		const t = line.trim();
-		if (!t || t.startsWith('#')) continue;
-		if (listKey && t.startsWith('- ')) {
-			data[listKey].push(unquote(t.slice(2).trim()));
-			continue;
-		}
-		const c = t.indexOf(':');
-		if (c === -1) {
-			listKey = null;
-			continue;
-		}
-		const key = t.slice(0, c).trim();
-		const v = t.slice(c + 1).trim();
-		if (v === '') {
-			data[key] = []; // a simple YAML list may follow on subsequent "- " lines
-			listKey = key;
-			continue;
-		}
-		listKey = null;
-		data[key] = unquote(v);
-	}
-	return { data, body: md.slice(end + marker.length) };
-}
-
-function extractScript(body) {
-	const m = body.match(/^## Script\s*$/m);
-	if (!m) throw new Error('Podcast Markdown must contain a "## Script" heading');
-	return body.slice(m.index + m[0].length).trim();
 }
 
 function domainOf(url) {
