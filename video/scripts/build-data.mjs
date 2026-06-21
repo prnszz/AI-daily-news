@@ -21,6 +21,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadDotEnv, parseFrontmatter, extractScript } from '../../lib/md.mjs';
+import { site } from '../../site.config.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -30,9 +31,9 @@ const DATA_DIR = path.resolve(__dirname, '..', 'data');
 // regenerating the audio changes the hash and transparently re-transcribes.
 const WHISPER_CACHE_DIR = path.resolve(DATA_DIR, '.whisper-cache');
 
-const BRAND = 'AIトレンド Digest';
-const SITE_URL = 'https://prnszz.github.io/AI-daily-news';
-const X_HANDLE = '@AITLND';
+const BRAND = site.brand;
+const SITE_URL = site.baseUrl;
+const X_HANDLE = site.xHandle;
 const FPS = 30;
 const ACCENTS = ['#2dd4bf', '#67e8f9', '#a3e635'];
 const MIN_GAP_MS = 4000;

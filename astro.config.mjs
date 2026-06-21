@@ -1,16 +1,16 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { site } from './site.config.mjs';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://prnszz.github.io',
-  base: '/AI-daily-news',
+  site: site.origin,
+  base: site.base,
   integrations: [
     starlight({
-      title: 'AIトレンド Digest',
-      description:
-        'AI開発、研究、プロダクト、コミュニティの重要トピックを日本語で短く整理するデイリー/ウィークリーDigest。',
+      title: site.brand,
+      description: site.description,
       locales: {
         root: {
           label: '日本語',
@@ -18,12 +18,12 @@ export default defineConfig({
         },
       },
       social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/prnszz/AI-daily-news' },
-        { icon: 'x.com', label: 'X', href: 'https://x.com/AITLND' },
+        { icon: 'github', label: 'GitHub', href: site.githubUrl },
+        { icon: 'x.com', label: 'X', href: site.xUrl },
         {
           icon: 'youtube',
           label: 'YouTube',
-          href: 'https://www.youtube.com/@AITLND',
+          href: site.youtubeUrl,
         },
       ],
       sidebar: [
