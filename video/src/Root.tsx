@@ -2,6 +2,7 @@ import { Composition } from 'remotion';
 import { DailyDigest } from './DailyDigest';
 import { WeeklyDigest } from './WeeklyDigest';
 import { Thumbnail } from './Thumbnail';
+import { WeeklyCover } from './WeeklyCover';
 import { sampleProps, weeklySampleProps } from './sample';
 import type { DailyDigestProps, WeeklyDigestProps } from './types';
 
@@ -42,6 +43,15 @@ export const RemotionRoot = () => {
 				width={1280}
 				height={720}
 				defaultProps={sampleProps}
+			/>
+			<Composition
+				id="WeeklyThumbnail"
+				component={WeeklyCover}
+				durationInFrames={1}
+				fps={30}
+				width={1280}
+				height={720}
+				defaultProps={weeklySampleProps}
 			/>
 		</>
 	);

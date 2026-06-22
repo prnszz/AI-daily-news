@@ -11,10 +11,10 @@ export const WeeklyRecap = ({ blocks, week }: { blocks: WeeklyBlock[]; week: str
 	const { fps } = useVideoConfig();
 	const titleOpacity = interpolate(frame, [0, 16], [0, 1], { extrapolateRight: 'clamp' });
 	const titleY = interpolate(frame, [0, 16], [24, 0], { extrapolateRight: 'clamp' });
-	const gap = blocks.length > 7 ? 14 : 18;
+	const gap = blocks.length > 7 ? 24 : 28;
 
 	return (
-		<AbsoluteFill style={{ justifyContent: 'center', padding: '0 130px 80px' }}>
+		<AbsoluteFill style={{ justifyContent: 'center', padding: '72px 130px 72px' }}>
 			<div style={{ opacity: titleOpacity, transform: `translateY(${titleY}px)`, marginBottom: 40 }}>
 				<div style={{ fontFamily: FONT_FAMILY, fontSize: 28, fontWeight: 700, letterSpacing: 6, color: COLORS.cyan }}>
 					RECAP
@@ -35,7 +35,7 @@ export const WeeklyRecap = ({ blocks, week }: { blocks: WeeklyBlock[]; week: str
 					});
 					const x = interpolate(rowEnter, [0, 1], [36, 0]);
 					const w = visualWidth(b.heading);
-					const font = w > 46 ? 24 : w > 34 ? 27 : 30;
+					const font = w > 46 ? 26 : w > 34 ? 29 : 32;
 					return (
 						<div
 							key={i}

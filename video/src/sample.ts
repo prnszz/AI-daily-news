@@ -33,6 +33,7 @@ export const sampleProps: DailyDigestProps = {
 // Placeholder image uses favicon.svg; real renders use locally-downloaded images.
 export const weeklySampleProps: WeeklyDigestProps = {
 	week: '2026-W25',
+	theme: '買収・人材流出・オープンモデル',
 	brand: 'AIトレンド Digest',
 	siteUrl: 'https://prnszz.github.io/AI-daily-news',
 	xHandle: '@AITLND',

@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "build-data": "node scripts/build-data.mjs",
+    "build-data-weekly": "node scripts/build-data-weekly.mjs",
     "studio": "remotion studio",
     "render": "node scripts/render.mjs",
-    "publish-assets": "node scripts/publish-assets.mjs"
+    "publish-assets": "node scripts/publish-assets.mjs",
+    "publish-assets-weekly": "node scripts/publish-assets-weekly.mjs"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.0",

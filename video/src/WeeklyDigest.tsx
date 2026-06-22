@@ -2,7 +2,9 @@ import { AbsoluteFill, Audio, Sequence, staticFile, useVideoConfig } from 'remot
 import { Background } from './components/Background';
 import { Closing } from './components/Closing';
 import { Cover } from './components/Cover';
+import { FadeIn, FadeOutAtEnd } from './components/Fade';
 import { Header } from './components/Header';
+import { WeeklyCover } from './WeeklyCover';
 import { WeeklyRecap } from './components/WeeklyRecap';
 import { WeeklySplitScene } from './components/WeeklySplitScene';
 import type { WeeklyDigestProps } from './types';
@@ -21,11 +23,29 @@ export const WeeklyDigest = (props: WeeklyDigestProps) => {
 			<Background />
 			<Header brand={props.brand} date={props.week} />
 
-			{firstStart > 400 ? (
-				<Sequence durationInFrames={ms(firstStart)} name="cover">
-					<Cover brand={props.brand} date={props.week} />
-				</Sequence>
-			) : null}
+			{firstStart > 400
+				? (() => {
+						// First sentence = branded Cover; the rest of the intro narration
+						// (the week's overview) rides the theme cover, so the visual matches.
+						const introSplit = Math.min(firstStart, props.captions?.[0]?.endMs ?? 6000);
+						const xfade = 14; // cross-fade frames between Cover and the theme cover
+						const coverDur = ms(introSplit) + xfade; // overlap the two scenes for the fade
+						return (
+							<>
+								<Sequence durationInFrames={coverDur} name="cover">
+									<FadeOutAtEnd durationInFrames={coverDur} frames={xfade}>
+										<Cover brand={props.brand} date={props.week} subtitle="今週のまとめ" />
+									</FadeOutAtEnd>
+								</Sequence>
+								<Sequence from={ms(introSplit)} durationInFrames={Math.max(1, ms(firstStart - introSplit))} name="theme-cover">
+									<FadeIn frames={xfade}>
+										<WeeklyCover {...props} />
+									</FadeIn>
+								</Sequence>
+							</>
+						);
+					})()
+				: null}
 
 			{/* One split scene per block (news / repo / paper), timed to narration */}
 			{blocks.map((b, i) => (

@@ -47,6 +47,8 @@ export type WeeklyBlock = {
 
 export type WeeklyDigestProps = {
 	week: string; // "2026-W25"
+	/** Cover keywords, ・-separated, e.g. "買収・人材流出・オープン化". */
+	theme?: string;
 	brand: string;
 	siteUrl: string;
 	xHandle: string;

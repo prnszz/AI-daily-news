@@ -1,7 +1,7 @@
 import { AbsoluteFill, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { ACCENT_GRADIENT, COLORS, FONT_FAMILY } from '../theme';
 
-export const Cover = ({ brand, date }: { brand: string; date: string }) => {
+export const Cover = ({ brand, date, subtitle = '今日のAIニュース' }: { brand: string; date: string; subtitle?: string }) => {
 	const frame = useCurrentFrame();
 	const { fps } = useVideoConfig();
 	const enter = spring({ frame, fps, config: { damping: 200 } });
@@ -29,7 +29,7 @@ export const Cover = ({ brand, date }: { brand: string; date: string }) => {
 						{brand}
 					</div>
 					<div style={{ width: 340, height: 8, borderRadius: 4, background: ACCENT_GRADIENT }} />
-					<div style={{ fontFamily: FONT_FAMILY, fontSize: 52, fontWeight: 600, color: COLORS.cyan }}>今日のAIニュース</div>
+					<div style={{ fontFamily: FONT_FAMILY, fontSize: 52, fontWeight: 600, color: COLORS.cyan }}>{subtitle}</div>
 					<div style={{ fontFamily: FONT_FAMILY, fontSize: 42, color: COLORS.muted }}>{date}</div>
 				</div>
 			</div>

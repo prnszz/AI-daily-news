@@ -91,8 +91,6 @@ export const WeeklySplitScene = ({ block }: { block: WeeklyBlock }) => {
 						opacity,
 						borderRadius: 24,
 						overflow: 'hidden',
-						background: COLORS.panel,
-						border: `1px solid ${COLORS.panelBorder}`,
 						display: 'flex',
 						alignItems: 'center',
 						justifyContent: 'center',

@@ -4,6 +4,9 @@ dist/
 out/
 # remotion generated caption data (re-creatable via pnpm build-data)
 video/data/
+# weekly video assets (downloaded images + narration audio) — local-only, re-creatable
+public/weekly-assets/
+public/audio/weekly/
 # generated types
 .astro/
 .claude/
