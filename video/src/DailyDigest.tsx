@@ -2,8 +2,10 @@ import { AbsoluteFill, Audio, Sequence, staticFile, useVideoConfig } from 'remot
 import { Background } from './components/Background';
 import { Closing } from './components/Closing';
 import { Cover } from './components/Cover';
+import { FadeIn, FadeOutAtEnd } from './components/Fade';
 import { Header } from './components/Header';
 import { Recap } from './components/Recap';
+import { Thumbnail } from './Thumbnail';
 import { TopicScene } from './components/TopicScene';
 import type { DailyDigestProps } from './types';
 
@@ -22,11 +24,29 @@ export const DailyDigest = (props: DailyDigestProps) => {
 			<Header brand={props.brand} date={props.date} />
 
 			{/* Intro (only if there is meaningful lead-in narration) */}
-			{firstStart > 400 ? (
-				<Sequence durationInFrames={ms(firstStart)} name="cover">
-					<Cover brand={props.brand} date={props.date} />
-				</Sequence>
-			) : null}
+			{firstStart > 400
+				? (() => {
+						// First sentence = branded Cover; the rest of the intro narration
+						// (today's overview) rides the thumbnail, so the visual matches.
+						const introSplit = Math.min(firstStart, props.captions?.[0]?.endMs ?? 6000);
+						const xfade = 14; // cross-fade frames between Cover and the overview
+						const coverDur = ms(introSplit) + xfade;
+						return (
+							<>
+								<Sequence durationInFrames={coverDur} name="cover">
+									<FadeOutAtEnd durationInFrames={coverDur} frames={xfade}>
+										<Cover brand={props.brand} date={props.date} />
+									</FadeOutAtEnd>
+								</Sequence>
+								<Sequence from={ms(introSplit)} durationInFrames={Math.max(1, ms(firstStart - introSplit))} name="opening">
+									<FadeIn frames={xfade}>
+										<Thumbnail {...props} />
+									</FadeIn>
+								</Sequence>
+							</>
+						);
+					})()
+				: null}
 
 			{/* One scene per topic, timed to the narration via Whisper anchors */}
 			{topics.map((t, i) => (
