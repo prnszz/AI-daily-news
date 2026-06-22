@@ -1,0 +1,20 @@
+---
+// Auto-generated list of the most recent Weekly pages for the homepage.
+// Mirrors DailyArchive so the Weekly section stays in sync without manual edits.
+import { LinkCard } from '@astrojs/starlight/components';
+import { getCollection } from 'astro:content';
+
+interface Props {
+	/** How many of the most recent weeks to show. */
+	limit?: number;
+}
+const { limit = 8 } = Astro.props;
+// BASE_URL may or may not carry a trailing slash; normalize so we always join with one.
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const weeks = (await getCollection('docs', (e) => e.id.startsWith('weekly/')))
+	.sort((a, b) => (a.id < b.id ? 1 : -1)) // newest first (ids are YYYY-Www)
+	.slice(0, limit);
+---
+
+{weeks.map((w) => <LinkCard title={w.id.replace(/^weekly\//, '')} href={`${base}/${w.id}/`} />)}
