@@ -185,7 +185,12 @@ function resolveCards(topics, cards) {
 function anchorTopics(topics, cp, charTime, durationMs, topicAnchors) {
 	const lower = cp.join('').toLowerCase();
 	const n = topics.length;
-	const matomeIdx = lower.indexOf('まとめ');
+	// Locate the closing recap. Prefer the explicit "今日のまとめ" marker so an
+	// earlier incidental "まとめる" in the intro/body can't pin the outro too early
+	// (which would clamp every topic card to a negative time). Fall back to the last
+	// "まとめ", then to 90% of the runtime.
+	let matomeIdx = lower.indexOf('今日のまとめ');
+	if (matomeIdx < 0) matomeIdx = lower.lastIndexOf('まとめ');
 	const outroStartMs = matomeIdx >= 0 ? Math.round(charTime(matomeIdx)) : Math.round(durationMs * 0.9);
 	const lastBodyIdx = matomeIdx >= 0 ? matomeIdx : cp.length;
 
