@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 
 // Build a sidebar group from the files in a docs subdirectory, newest-first by
 // filename — so Daily/Weekly order is derived automatically and no page needs a
-// hand-written `sidebar.order`.
+// hand-written `sidebar.order`. The slug IS the human label (Daily "2026-06-28",
+// Weekly "2026-0622-0628"), so the nav reads as a date with no formatting.
 function archiveItems(dir) {
   const abs = fileURLToPath(new URL(`./src/content/docs/${dir}`, import.meta.url));
   if (!fs.existsSync(abs)) return [];
